@@ -1,11 +1,14 @@
 # Script made by GraFX Software Solutions - www.grafxsoftware.com
 # use at your own risk.
+#
+# extended for use with Plesk 10.3 and added a feature to NOT 
+# overwrite existing nginx.conf files by Alexey Kulikov <me@clops.at>
+#
 # this script will read from PLESK database all your domains and 
 # subdomains and will generate the conf files in 
 # /var/www/vhosts/*/conf/nginx.conf
 # You must have the 2 template near this script. 
 # template_dom.conf and template_subdom.conf
-
 # /usr/local/psa/admin/sbin/websrvmng --set-http-port --port=8080
 # /usr/local/psa/admin/sbin/websrvmng --reconfigure-all
 # /usr/local/psa/admin/sbin/webmailmng --disable --name=horde
@@ -17,7 +20,6 @@
 #To get a custom Apache web server http port, issue the following command:
 # /usr/local/psa/admin/sbin/websrvmng --get-http-port
 # /opt/sitebuilder/utils/configure --httpd_port 8080
-
 # Change the application_url  parameter in Sitebuilder configuration file:
 # host# grep application_url /opt/sitebuilder/config
 # application_url = "http://sitebuilder.<hostname>:8080"
@@ -32,8 +34,10 @@ IPADD=`ifconfig  | grep 'inet addr:'| grep -v '127.0.0.1' | cut -d: -f2 | awk '{
 
 echo "IP = $IPADD"
 process() {
-	cat "$1" | sed -e "s/{DOMAIN}/$R_DOMAIN/g" -e "s/{SUBDOMAIN}/$R_SUBDOMAIN/g" -e "s/{DOMAINALIAS}/$R_DOMAINALIAS/g" -e "s/{IPADD}/$R_IPADD/g" >> $2
-
+    #if [ ! -f $2 ];
+    #then
+        cat "$1" | sed -e "s/{DOMAIN}/$R_DOMAIN/g" -e "s/{SUBDOMAIN}/$R_SUBDOMAIN/g" -e "s/{DOMAINALIAS}/$R_DOMAINALIAS/g" -e "s/{IPADD}/$R_IPADD/g" >> $2
+    #fi
 }
 	
 R_DOMAIN=""
@@ -54,33 +58,38 @@ do
 	done
 	outdir="/var/www/vhosts/$domain/conf"
 	outfile="$outdir/nginx.conf"
-	echo $outfile
+
+    if [ -f $outfile ];
+    then
+        echo $outfile ' exists... skipping'
+        continue
+    fi
+	echo $outfile 'Created!'    
+
 	echo > "$outfile"
 	R_DOMAIN=$domain
 	R_DOMAINALIAS=$aliases
 	process "$srcdir/template_dom.conf" "$outfile"
-	process "$srcdir/template_webmail.conf" "$outfile"
-	process "$srcdir/template_sitebuilder.conf" "$outfile"
-	process "$srcdir/template_lists.conf" "$outfile"
+#	process "$srcdir/template_webmail.conf" "$outfile"
+#	process "$srcdir/template_sitebuilder.conf" "$outfile"
+#	process "$srcdir/template_lists.conf" "$outfile"
+
+    ### Now Append all Subdomains ##
+    R_DOMAINALIAS=""
+
+    echo "select concat(subdomains.name,'#',domains.name) from subdomains,domains where subdomains.dom_id=domains.id and domains.name='$domain';" | mysql -BN -u admin -p`cat /etc/psa/.psa.shadow` psa  | 
+    while read line
+    do
+        subdomain=`echo $line | cut -f 1 -d "#"`
+        domain=`echo $line | cut -f 2 -d "#"`
+        
+        outdir="/var/www/vhosts/$domain/conf"
+        outfile="$outdir/nginx.conf"
+        echo $outfile  "($subdomain)"
+        
+        R_DOMAIN=$domain
+        R_SUBDOMAIN=$subdomain
+    
+        process "$srcdir/template_subdom.conf" "$outfile"
+    done
 done
-
-R_DOMAINALIAS=""
-
-echo 'select concat(subdomains.name,"#",domains.name) from subdomains,domains where subdomains.dom_id=domains.id;' | mysql -BN -u admin -p`cat /etc/psa/.psa.shadow` psa  | 
-while read line
-do
-	subdomain=`echo $line | cut -f 1 -d "#"`
-	domain=`echo $line | cut -f 2 -d "#"`
-	
-	outdir="/var/www/vhosts/$domain/conf"
-	outfile="$outdir/nginx.conf"
-	echo $outfile  "($subdomain)"
-	
-	R_DOMAIN=$domain
-	R_SUBDOMAIN=$subdomain
-
-	process "$srcdir/template_subdom.conf" "$outfile"
-done
-
-
-# Script made by GraFX Software Solutions - www.grafxsoftware.com

@@ -1,0 +1,11 @@
+This is a set of scrips that has been initially published here:
+
+http://www.grafxsoftware.com/faq.php/HOW-TO-configure-PLESK-with-NGinx-proxy-reverse/1/1/
+
+I have taken the liberty to extend and adapt them to be used on Plesk 10.3+, I have
+also modified the script NOT to overwrite existing nginx.conf files allowing
+for hand-tuning of vhosts on demand.
+
+Thanks for using these,
+
+Alexey Kulikov (me@clops.at)
